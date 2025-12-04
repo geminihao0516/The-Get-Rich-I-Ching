@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>互動式圖卡 V2.5 發財版</title>
+    <meta name="description" content="互動式易經抽卡應用，上傳4x4格線圖片進行財運占卜">
+    <meta name="theme-color" content="#DC2626">
+
+    <!-- 預加載關鍵資源 -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background-color: #f0f4f8;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 24px 24px;
+            touch-action: manipulation;
+            overflow: hidden;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        /* 動畫定義 */
+        .card-enter-right { animation: slideInRight 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        
+        @keyframes slideInRight { 
+            from { opacity: 0; transform: translateX(40px) scale(0.9); } 
+            to { opacity: 1; transform: translateX(0) scale(1); } 
+        }
+        
+        .shuffle-anim { animation: shake 0.5s ease-in-out; }
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            20% { transform: rotate(-3deg) scale(1.05); }
+            40% { transform: rotate(3deg) scale(1.05); }
+            60% { transform: rotate(-3deg) scale(1.05); }
+            80% { transform: rotate(3deg) scale(1.05); }
+        }
+
+        /* 財神爺點擊特效 */
+        .caishen-anim { animation: bounce 0.6s ease-in-out; }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px) scale(1.1); }
+        }
+
+        /* 新增: 錢幣特效動畫 */
+        .money-anim { animation: floatUp 1s ease-out forwards; }
+        @keyframes floatUp {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -150%) scale(1); }
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="h-[100dvh] w-full flex flex-col items-center justify-center p-4 text-slate-800">
+
+    <!-- 標題區 (新增財神爺) -->
+    <header class="mb-4 md:mb-6 text-center relative z-10 flex-shrink-0 flex items-center justify-center gap-3">
+        <!-- SVG 財神爺圖示 -->
+        <div id="caishen-icon" class="w-12 h-12 cursor-pointer hover:scale-110 transition-transform filter drop-shadow-md" title="點我發財">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <!-- 官帽翅膀 (金) -->
+                <path d="M10 45 Q5 45 5 55 T10 65 H20 V45 H10 Z" fill="#F59E0B" />
+                <path d="M90 45 Q95 45 95 55 T90 65 H80 V45 H90 Z" fill="#F59E0B" />
+                <!-- 官帽主體 (紅) -->
+                <path d="M20 45 L25 20 Q50 10 75 20 L80 45 Z" fill="#DC2626" />
+                <rect x="20" y="45" width="60" height="20" fill="#DC2626" />
+                <circle cx="50" cy="45" r="8" fill="#F59E0B" stroke="#B45309" stroke-width="2"/>
+                <!-- 臉部 (膚色) -->
+                <path d="M25 65 Q25 95 50 95 Q75 95 75 65 Z" fill="#FDE68A" />
+                <!-- 鬍子 (黑) -->
+                <path d="M40 82 Q50 98 60 82 L60 88 Q50 100 40 88 Z" fill="#1F2937" />
+                <!-- 五官 -->
+                <circle cx="38" cy="72" r="2" fill="#1F2937" />
+                <circle cx="62" cy="72" r="2" fill="#1F2937" />
+                <path d="M42 80 Q50 85 58 80" stroke="#DC2626" stroke-width="2" fill="none" stroke-linecap="round"/>
+            </svg>
+        </div>
+
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-slate-700 flex flex-col items-start leading-none">
+            <span>互動圖卡</span>
+            <span class="text-xs font-bold text-red-500 bg-red-100 px-2 py-0.5 rounded-full tracking-wider mt-1">V2.5 優化版</span>
+        </h1>
+    </header>
+
+    <!-- 1. 上傳區塊 -->
+    <section id="upload-section" class="w-full max-w-md glass-panel rounded-3xl shadow-2xl p-8 text-center border border-white/60 cursor-pointer hover:bg-white/95 transition-all duration-300 group relative overflow-hidden z-20" aria-label="上傳圖片區域">
+        <div class="absolute inset-0 bg-gradient-to-br from-red-50/50 to-orange-100/50 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true"></div>
+
+        <div class="relative z-10 flex flex-col items-center">
+            <div class="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-6 text-red-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-inner" aria-hidden="true">
+                <i data-lucide="image-plus" size="40"></i>
+            </div>
+
+            <h2 class="text-2xl font-bold text-slate-800 mb-3">上傳 4x4 格線圖</h2>
+            <p class="text-slate-500 mb-8 text-base leading-relaxed max-w-[260px]">
+                上傳一張包含 16 格圖案的圖片<br/>
+                <span class="text-sm text-red-600 font-medium bg-red-50 px-3 py-1 rounded-full mt-3 inline-block">自動裁切 • 財源廣進</span>
+            </p>
+
+            <button type="button" class="bg-red-600 text-white font-bold py-4 px-10 rounded-full shadow-lg shadow-red-200 hover:shadow-red-300 hover:bg-red-700 hover:-translate-y-1 transition-all pointer-events-none w-full max-w-[200px] flex items-center justify-center gap-2" aria-label="選擇要上傳的圖片">
+                <span>選擇圖片</span>
+                <i data-lucide="arrow-right" size="18" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <input id="fileInput" type="file" accept="image/*" class="hidden" aria-label="選擇圖片檔案" />
+        
+        <div id="loading-overlay" class="absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center hidden backdrop-blur-sm" role="status" aria-live="polite">
+            <div class="w-12 h-12 border-[4px] border-red-100 border-t-red-600 rounded-full animate-spin mb-4" aria-hidden="true"></div>
+            <span class="text-red-600 font-bold text-lg animate-pulse">正在準備您的圖卡...</span>
+        </div>
+    </section>
+
+    <!-- 2. 主應用程式區塊 -->
+    <main id="main-app" class="hidden w-full max-w-md flex-col gap-4 relative z-10 h-full md:h-auto max-h-[85vh]" role="main">
+
+        <!-- 工具列 -->
+        <nav class="glass-panel rounded-2xl p-2 pl-3 flex justify-between items-center shadow-sm flex-shrink-0" aria-label="圖卡操作工具列">
+            <!-- 左側計數 -->
+            <div class="bg-slate-800 text-white text-sm font-mono font-bold py-1.5 px-3 rounded-lg shadow-md whitespace-nowrap" id="counter-badge" role="status" aria-live="polite" aria-label="當前卡片位置">
+                1 / 16
+            </div>
+
+            <!-- 右側按鈕群 -->
+            <div class="flex gap-2" role="group" aria-label="操作按鈕">
+                <!-- 洗牌按鈕改為來財按鈕 (金色) -->
+                <button id="btn-shuffle" type="button" class="py-1.5 px-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-xl text-sm font-bold shadow-md shadow-yellow-200 hover:from-yellow-600 hover:to-yellow-700 hover:shadow-lg active:scale-95 transition-all flex items-center gap-1.5" aria-label="重新洗牌來財">
+                    <i data-lucide="coins" size="16" aria-hidden="true"></i>
+                    <span>來財</span>
+                </button>
+
+                <div class="w-[1px] h-8 bg-gray-300 mx-0.5" aria-hidden="true"></div>
+
+                <button id="btn-view-toggle" type="button" class="p-2 text-slate-600 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all" title="切換總覽" aria-label="切換總覽模式">
+                    <i data-lucide="grid-3x3" size="20" aria-hidden="true"></i>
+                </button>
+                <button id="btn-reset" type="button" class="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all" title="重置" aria-label="重置應用並重新上傳圖片">
+                    <i data-lucide="trash-2" size="20" aria-hidden="true"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- A. 單張瀏覽 -->
+        <div id="single-view" class="relative w-full flex-1 min-h-0 flex flex-col justify-center py-2">
+            <!-- 修改: 加大卡片顯示區域，移除 aspect-ratio，減少 padding -->
+            <div class="glass-panel rounded-3xl shadow-2xl overflow-hidden w-full h-full relative border border-white flex items-center justify-center group select-none bg-white mx-auto">
+                <div id="gesture-zone" class="absolute inset-0 z-20 cursor-grab active:cursor-grabbing touch-pan-y"></div>
+                <!-- 新增: 錢幣特效容器 -->
+                <div id="money-effect-container" class="absolute inset-0 pointer-events-none z-30 flex items-center justify-center"></div>
+                <!-- 修改: 減少 padding -->
+                <img id="card-image" src="" class="w-full h-full object-contain p-1 sm:p-2 transition-transform duration-500 pointer-events-none" alt="Card">
+                <!-- 手機提示文字 -->
+                <div id="mobile-hint" class="absolute bottom-6 left-1/2 -translate-x-1/2 text-slate-300/80 text-sm font-bold pointer-events-none animate-pulse md:hidden whitespace-nowrap flex items-center gap-1 bg-slate-800/50 px-3 py-1 rounded-full text-white" role="tooltip">
+                    <i data-lucide="arrow-left" size="16" aria-hidden="true"></i> 向左滑動來財
+                </div>
+                <div class="absolute bottom-0 left-0 h-1.5 bg-yellow-500 transition-all duration-300 z-10" id="progress-bar" style="width: 0%" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+
+            <!-- 導航按鈕 -->
+            <button id="nav-prev" type="button" class="absolute top-1/2 -left-5 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-slate-700 hover:text-blue-600 hover:scale-110 hover:shadow-xl transition-all z-30 disabled:opacity-0 disabled:pointer-events-none border border-slate-100 hidden" aria-label="上一張卡片">
+                <i data-lucide="chevron-left" size="28" aria-hidden="true"></i>
+            </button>
+            <button id="nav-next" type="button" class="absolute top-1/2 -right-5 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-slate-700 hover:text-blue-600 hover:scale-110 hover:shadow-xl transition-all z-30 disabled:opacity-0 disabled:pointer-events-none border border-slate-100 hidden md:flex" aria-label="下一張卡片">
+                <i data-lucide="chevron-right" size="28" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <!-- B. 總覽模式 -->
+        <section id="grid-view" class="hidden glass-panel rounded-3xl p-4 shadow-xl h-[70vh] md:h-auto overflow-y-auto no-scrollbar bg-white/60 flex-1" aria-label="圖卡總覽模式">
+            <div class="grid grid-cols-4 gap-3" id="grid-container" role="list"></div>
+        </section>
+    </main>
+
+    <canvas id="processCanvas" class="hidden"></canvas>
+
+    <script>
+        'use strict';
+
+        // 應用狀態管理
+        const AppState = {
+            cards: [],
+            displayIndices: [],
+            currentIndex: 0,
+            isGridView: false,
+            isProcessing: false
+        };
+
+        // 常量配置
+        const CONFIG = {
+            GRID_COLS: 4,
+            GRID_ROWS: 4,
+            MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+            ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+            HINT_TIMEOUT: 4000,
+            TOAST_TIMEOUT: 1500,
+            ANIMATION_TIMEOUT: 500
+        };
+
+        // 確保 Lucide 正確加載後再初始化
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        } else {
+            console.error("Lucide icons library failed to load.");
+        }
+
+        const dom = {
+            uploadSection: document.getElementById('upload-section'),
+            mainApp: document.getElementById('main-app'),
+            fileInput: document.getElementById('fileInput'),
+            loadingOverlay: document.getElementById('loading-overlay'),
+            cardImage: document.getElementById('card-image'),
+            counterBadge: document.getElementById('counter-badge'),
+            progressBar: document.getElementById('progress-bar'),
+            mobileHint: document.getElementById('mobile-hint'),
+            singleView: document.getElementById('single-view'),
+            gridView: document.getElementById('grid-view'),
+            gridContainer: document.getElementById('grid-container'),
+            btnPrev: document.getElementById('nav-prev'),
+            btnNext: document.getElementById('nav-next'),
+            btnShuffle: document.getElementById('btn-shuffle'),
+            btnReset: document.getElementById('btn-reset'),
+            btnViewToggle: document.getElementById('btn-view-toggle'),
+            gestureZone: document.getElementById('gesture-zone'),
+            canvas: document.getElementById('processCanvas'),
+            caishenIcon: document.getElementById('caishen-icon'),
+            moneyEffectContainer: document.getElementById('money-effect-container') // 新增
+        };
+        
+        const ctx = dom.canvas.getContext('2d', { willReadFrequently: true });
+
+        // 工具函數：顯示 Toast 訊息
+        function showToast(message, type = 'success') {
+            const bgColor = type === 'error' ? 'bg-red-600' : 'bg-red-600';
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.className = `fixed top-20 left-1/2 -translate-x-1/2 ${bgColor} text-white px-4 py-2 rounded-full shadow-lg font-bold text-lg animate-[bounce_1s_ease-out_forwards] z-50`;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), CONFIG.TOAST_TIMEOUT);
+        }
+
+        // 財神爺互動
+        dom.caishenIcon.addEventListener('click', () => {
+            dom.caishenIcon.classList.remove('caishen-anim');
+            void dom.caishenIcon.offsetWidth;
+            dom.caishenIcon.classList.add('caishen-anim');
+
+            const wishes = ["恭喜發財!", "財源廣進!", "好運連連!", "大吉大利!"];
+            const randomWish = wishes[Math.floor(Math.random() * wishes.length)];
+            showToast(randomWish);
+        });
+
+        dom.uploadSection.addEventListener('click', () => dom.fileInput.click());
+        dom.fileInput.addEventListener('change', handleFileUpload);
+        dom.btnPrev.addEventListener('click', () => changeCard('prev'));
+        dom.btnNext.addEventListener('click', () => changeCard('next'));
+        dom.btnShuffle.addEventListener('click', handleShuffle);
+        dom.btnReset.addEventListener('click', resetApp);
+        dom.btnViewToggle.addEventListener('click', toggleViewMode);
+
+        // 鍵盤操作 (移除向左鍵)
+        document.addEventListener('keydown', (e) => {
+            if (dom.mainApp.classList.contains('hidden')) return;
+            // if (e.key === 'ArrowLeft') changeCard('prev'); // 移除
+            if (e.key === 'ArrowRight') {
+                changeCard('next');
+                // showMoneyEffect() 移至 changeCard 統一觸發
+            }
+            if (e.code === 'Space') { e.preventDefault(); handleShuffle(); }
+        });
+
+        let touchStartX = 0;
+        let touchEndX = 0;
+        dom.gestureZone.addEventListener('touchstart', (e) => touchStartX = e.changedTouches[0].screenX, {passive: true});
+        // 修改: 只允許向左滑動 (next)
+        dom.gestureZone.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            if (touchStartX - touchEndX > 50) { // 向左滑
+                changeCard('next');
+                // showMoneyEffect() 移至 changeCard 統一觸發
+            }
+        }, {passive: true});
+
+        // 新增: 顯示錢幣特效
+        function showMoneyEffect() {
+            const money = document.createElement('div');
+            money.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m7.1 10.37-1.6.57"/><path d="M7 10h2v4"/><path d="M9 10v3H8.91"/><path d="M13 6h1v4"/><path d="m13.1 10.37-1.6.57"/><path d="M13 10h2v4"/><path d="M15 10v3h-.09"/></svg>';
+            money.className = 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 money-anim z-50 pointer-events-none drop-shadow-lg';
+            dom.moneyEffectContainer.appendChild(money);
+            setTimeout(() => money.remove(), 1000);
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 檔案驗證
+            if (!CONFIG.ALLOWED_TYPES.includes(file.type)) {
+                showToast('請上傳有效的圖片格式 (JPG, PNG, WebP, GIF)', 'error');
+                dom.fileInput.value = '';
+                return;
+            }
+
+            if (file.size > CONFIG.MAX_FILE_SIZE) {
+                showToast('圖片大小不得超過 10MB', 'error');
+                dom.fileInput.value = '';
+                return;
+            }
+
+            if (AppState.isProcessing) return;
+            AppState.isProcessing = true;
+
+            dom.loadingOverlay.classList.remove('hidden');
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => processImage(img);
+                img.onerror = () => {
+                    showToast('圖片載入失敗，請重試', 'error');
+                    dom.loadingOverlay.classList.add('hidden');
+                    AppState.isProcessing = false;
+                };
+                img.src = event.target.result;
+            };
+            reader.onerror = () => {
+                showToast('檔案讀取失敗，請重試', 'error');
+                dom.loadingOverlay.classList.add('hidden');
+                AppState.isProcessing = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function processImage(img) {
+            setTimeout(() => {
+                try {
+                    const cardWidth = img.width / CONFIG.GRID_COLS;
+                    const cardHeight = img.height / CONFIG.GRID_ROWS;
+
+                    if (cardWidth < 10 || cardHeight < 10) {
+                        throw new Error('圖片尺寸太小');
+                    }
+
+                    AppState.cards = [];
+                    const totalCards = CONFIG.GRID_ROWS * CONFIG.GRID_COLS;
+
+                    for (let i = 0; i < CONFIG.GRID_ROWS; i++) {
+                        for (let j = 0; j < CONFIG.GRID_COLS; j++) {
+                            dom.canvas.width = cardWidth;
+                            dom.canvas.height = cardHeight;
+                            ctx.clearRect(0, 0, cardWidth, cardHeight);
+                            ctx.drawImage(img, j * cardWidth, i * cardHeight, cardWidth, cardHeight, 0, 0, cardWidth, cardHeight);
+                            AppState.cards.push(dom.canvas.toDataURL('image/png'));
+                        }
+                    }
+
+                    AppState.displayIndices = Array.from({ length: totalCards }, (_, i) => i);
+                    AppState.currentIndex = 0;
+                    AppState.isGridView = false;
+                    AppState.isProcessing = false;
+
+                    dom.uploadSection.classList.add('hidden');
+                    dom.loadingOverlay.classList.add('hidden');
+                    dom.mainApp.classList.remove('hidden');
+                    dom.mainApp.classList.add('flex');
+
+                    setTimeout(() => dom.mobileHint?.classList.add('opacity-0'), CONFIG.HINT_TIMEOUT);
+                    updateCardDisplay(false);
+                    renderGrid();
+                } catch (error) {
+                    console.error('Image processing error:', error);
+                    showToast('圖片處理失敗：' + error.message, 'error');
+                    dom.loadingOverlay.classList.add('hidden');
+                    AppState.isProcessing = false;
+                }
+            }, CONFIG.ANIMATION_TIMEOUT);
+        }
+
+        function changeCard(direction) {
+            if (AppState.isGridView) return;
+
+            if (direction === 'next') {
+                if (AppState.currentIndex >= AppState.cards.length - 1) return;
+                AppState.currentIndex++;
+                showMoneyEffect();
+            } else if (direction === 'prev') {
+                if (AppState.currentIndex <= 0) return;
+                AppState.currentIndex--;
+            }
+            updateCardDisplay(true, direction);
+        }
+
+        function updateCardDisplay(animate = false, direction = 'next') {
+            const realIndex = AppState.displayIndices[AppState.currentIndex];
+            dom.cardImage.src = AppState.cards[realIndex];
+            dom.cardImage.alt = `圖卡 ${AppState.currentIndex + 1} / ${AppState.cards.length}`;
+
+            if (animate) {
+                dom.cardImage.className = "w-full h-full object-contain p-1 sm:p-2";
+                void dom.cardImage.offsetWidth;
+                dom.cardImage.classList.add('card-enter-right');
+            }
+
+            const progress = Math.round(((AppState.currentIndex + 1) / AppState.cards.length) * 100);
+            dom.counterBadge.textContent = `${AppState.currentIndex + 1} / ${AppState.cards.length}`;
+            dom.progressBar.style.width = `${progress}%`;
+            dom.progressBar.setAttribute('aria-valuenow', progress);
+
+            dom.btnPrev.disabled = AppState.currentIndex === 0;
+            dom.btnNext.disabled = AppState.currentIndex === AppState.cards.length - 1;
+        }
+
+        function handleShuffle() {
+            dom.singleView.classList.add('shuffle-anim');
+            setTimeout(() => dom.singleView.classList.remove('shuffle-anim'), CONFIG.ANIMATION_TIMEOUT);
+
+            // Fisher-Yates 洗牌算法
+            for (let i = AppState.displayIndices.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [AppState.displayIndices[i], AppState.displayIndices[j]] = [AppState.displayIndices[j], AppState.displayIndices[i]];
+            }
+
+            AppState.currentIndex = 0;
+            updateCardDisplay(true, 'next');
+            renderGrid();
+            if(AppState.isGridView) toggleViewMode();
+            showMoneyEffect();
+        }
+
+        function renderGrid() {
+            dom.gridContainer.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+
+            AppState.displayIndices.forEach((realIndex, viewIndex) => {
+                const div = document.createElement('div');
+                const isActive = viewIndex === AppState.currentIndex;
+                div.className = `aspect-[3/4] bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:ring-4 ring-yellow-200 transition-all relative ${isActive ? 'ring-4 ring-yellow-500 ring-offset-2 border-yellow-500' : 'border-gray-100'}`;
+                div.setAttribute('role', 'listitem');
+                div.setAttribute('aria-label', `圖卡 ${viewIndex + 1}`);
+                div.onclick = () => {
+                    AppState.currentIndex = viewIndex;
+                    updateCardDisplay(false);
+                    toggleViewMode();
+                };
+
+                const img = document.createElement('img');
+                img.src = AppState.cards[realIndex];
+                img.className = "w-full h-full object-contain p-1";
+                img.alt = `圖卡 ${viewIndex + 1}`;
+                img.loading = 'lazy';
+
+                const badge = document.createElement('span');
+                badge.className = "absolute top-0 left-0 bg-slate-800/80 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg backdrop-blur-sm";
+                badge.textContent = viewIndex + 1;
+                badge.setAttribute('aria-hidden', 'true');
+
+                div.appendChild(img);
+                div.appendChild(badge);
+                fragment.appendChild(div);
+            });
+
+            dom.gridContainer.appendChild(fragment);
+        }
+
+        function toggleViewMode() {
+            AppState.isGridView = !AppState.isGridView;
+            if (AppState.isGridView) {
+                dom.singleView.classList.add('hidden');
+                dom.gridView.classList.remove('hidden');
+                dom.btnViewToggle.innerHTML = '<i data-lucide="square-stack" size="20" aria-hidden="true"></i>';
+                dom.btnViewToggle.classList.add('bg-blue-100', 'text-blue-600');
+                dom.btnViewToggle.setAttribute('aria-pressed', 'true');
+                renderGrid();
+            } else {
+                dom.singleView.classList.remove('hidden');
+                dom.gridView.classList.add('hidden');
+                dom.btnViewToggle.innerHTML = '<i data-lucide="grid-3x3" size="20" aria-hidden="true"></i>';
+                dom.btnViewToggle.classList.remove('bg-blue-100', 'text-blue-600');
+                dom.btnViewToggle.setAttribute('aria-pressed', 'false');
+            }
+
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+
+        function resetApp() {
+            if(!confirm('確定要清除目前的圖片並重新上傳嗎？')) return;
+
+            dom.fileInput.value = '';
+            AppState.cards = [];
+            AppState.displayIndices = [];
+            AppState.currentIndex = 0;
+            AppState.isGridView = false;
+            AppState.isProcessing = false;
+
+            dom.mainApp.classList.add('hidden');
+            dom.mainApp.classList.remove('flex');
+            dom.uploadSection.classList.remove('hidden');
+            dom.mobileHint?.classList.remove('opacity-0');
+        }
+    </script>
+</body>
+</html>
