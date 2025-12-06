@@ -1,0 +1,16 @@
+{
+    "name": "發財易經圖卡",
+    "short_name": "發財易經",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#F0F4F8",
+    "theme_color": "#DC2626",
+    "description": "互動式易經抽卡應用，助您財源廣進",
+    "icons": [
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
